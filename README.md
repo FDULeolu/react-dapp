@@ -1,4 +1,4 @@
-# The Complete Guide to Full Stack Ethereum and EVM Development
+### The Complete Guide to Full Stack Ethereum and EVM Development
 
 教程网站：https://dev.to/dabit3/the-complete-guide-to-full-stack-ethereum-development-3j13
 
@@ -22,8 +22,6 @@ cd react-dapp
 npm install ethers hardhat @nomiclabs/hardhat-waffle ethereum-waffle chai @nomiclabs/hardhat-ethers
 ```
 
-安装并配置Ethereum开发环境
-
 #### 用hardhat初始化Ethereum开发环境
 
 ```bash
@@ -32,9 +30,7 @@ npx hardhat
 
 选择Create a JavaScript project并确认创建sample project
 
-![image-20231010103851753](/Users/leo-lu/Library/Application Support/typora-user-images/image-20231010103851753.png)
-
-打开hardhat.config.js文件，更新`module.exports`如下
+打开hardhat.config.js文件，更新`module.exports`
 
 ```javascript
 module.exports = {
@@ -188,10 +184,75 @@ Block #2:            0x50be2e76a6c2c586f06ecfd540395cd876c3f409a542a41d263addacb
 
 #### 连接MetaMask钱包
 
-首先在MetaMask上添加本地测试网络
+在MetaMask上添加本地测试网络
 
-![image-20231010155536487](/Users/leo-lu/Library/Application Support/typora-user-images/image-20231010155536487.png)
+> 关于PRC URL：应该为http://localhost:8545
 
-用创建节点时候得到的账户私钥添加账户，切换至localhost网络
+> 关于chainId：由于此前已经在`hardhat.config.js`中将`chainId`设置成了1337，添加本地网络的时候链ID应该使用1337，而非hardhat官方文档中的31337
 
-![image-20231010155754036](/Users/leo-lu/Library/Application Support/typora-user-images/image-20231010155754036.png)
+选择一个创建节点时候得到的账户私钥添加账户，切换至localhost网络，如果使用的是Account0应该看到账户中存在略小余10000的ETH，是因为部署合约会消耗少量的ETH（gas fee）
+
+#### 连接React用户
+
+打开`src/App.js`
+
+```javascript
+import './App.css';
+import { useState } from 'react';
+import { ethers } from 'ethers'
+import Greeter from './artifacts/contracts/Greeter.sol/Greeter.json'
+
+// Update with the contract address logged out to the CLI when it was deployed 
+const greeterAddress = "your-contract-address"
+
+function App() {
+  // store greeting in local state
+  const [greeting, setGreetingValue] = useState()
+
+  // request access to the user's MetaMask account
+  async function requestAccount() {
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+  }
+
+  // call the smart contract, read the current greeting value
+  async function fetchGreeting() {
+    if (typeof window.ethereum !== 'undefined') {
+      const provider = new ethers.providers.Web3Provider(window.ethereum)
+      const contract = new ethers.Contract(greeterAddress, Greeter.abi, provider)
+      try {
+        const data = await contract.greet()
+        console.log('data: ', data)
+      } catch (err) {
+        console.log("Error: ", err)
+      }
+    }    
+  }
+
+  // call the smart contract, send an update
+  async function setGreeting() {
+    if (!greeting) return
+    if (typeof window.ethereum !== 'undefined') {
+      await requestAccount()
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner()
+      const contract = new ethers.Contract(greeterAddress, Greeter.abi, signer)
+      const transaction = await contract.setGreeting(greeting)
+      await transaction.wait()
+      fetchGreeting()
+    }
+  }
+
+  return (
+    <div className="App">
+      <header className="App-header">
+        <button onClick={fetchGreeting}>Fetch Greeting</button>
+        <button onClick={setGreeting}>Set Greeting</button>
+        <input onChange={e => setGreetingValue(e.target.value)} placeholder="Set greeting" />
+      </header>
+    </div>
+  );
+}
+
+export default App;
+```
+
